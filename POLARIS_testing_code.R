@@ -7,7 +7,7 @@ countp001<-0
 
 p_thr<- 1
 
-for (sim in 1:1000){
+for (sim in 1:10){
 
     repl<- read.table(paste("./POLARIS_test_data/ScenarioA1/N10000_OR11_20/Test/simulation", sim, ".raw", sep=""), header=T)
 
