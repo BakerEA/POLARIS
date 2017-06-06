@@ -13,19 +13,25 @@ Below are generic install instructions for open source software, however, other 
 
 1) MPI:
 
-OpenMPI installation for MacOSX:
+OpenMPI installation:
 
 This can be downloaded from www.open-mpi.org
 
 Unzip the downloaded folder and save on your machine.
 
+For MacOSX:
+
 In Terminal, go into the downloaded folder and run the following commands:
 
-./configure - -prefix=/opt/openmpi 2>&1 | tee config.out
-make -j 4 2>&1 | tee make.out
-sudo make install 2>&1 | tee install.out
-export PATH=/opt/openmpi/bin:$PATH (Add permanently to path for easy use)
-ompi_info
+- ./configure - -prefix=/opt/openmpi 2>&1 | tee config.out
+
+- make -j 4 2>&1 | tee make.out
+
+- sudo make install 2>&1 | tee install.out
+
+- export PATH=/opt/openmpi/bin:$PATH (Add permanently to path for easy use)
+
+- ompi_info
 
 
 2) ANACONDA:
