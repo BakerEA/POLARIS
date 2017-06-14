@@ -60,25 +60,6 @@ for (sim in 1:10){
 	
 	p<-1-pchisq(null$deviance-fit$deviance,1)
 	
-	#Include PRS
-	
-	prs<- snps %*% summ$BETA
-	prs_norm<- ((prs-mean(prs))/sd(prs))
-	
-	
-    data1<-data.frame((repl$PHENOTYPE-1), prs_norm)
-    colnames(data1)[1]<- "Status"
-	
-	
-    null1<- glm(Status~1, data=data1, family="binomial")
-	fit1<- glm(Status~ prs_norm, data=data1, family="binomial")
-	
-	p1<-1-pchisq(null1$deviance-fit1$deviance,1)
-	
-	if (p1<=0.05){count1p05<-count1p05+1}
-	if (p1<=0.01){count1p01<-count1p01+1}
-	if (p1<=0.001){count1p001<-count1p001+1}
-	
 }
 
 
