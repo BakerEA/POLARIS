@@ -1,10 +1,6 @@
 
 strt_time<-Sys.time()
 
-countp05<-0
-countp01<-0
-countp001<-0
-
 p_thr<- 1
 
 for (sim in 1:10){
@@ -61,15 +57,6 @@ for (sim in 1:10){
 	p<-1-pchisq(null$deviance-fit$deviance,1)
 	
 }
-
-
-print("POLARIS")
-print( "P<0.05")
-print(countp05)
-print( "P<0.01")
-print(countp01)
-print( "P<0.001")
-print(countp001)
 
 print(Sys.time()-strt_time)
 
