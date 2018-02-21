@@ -1,66 +1,40 @@
 
-strt_time<-Sys.time()
-
-p_thr<- 1
+library(data.table)
 
 for (sim in 1:10){
 
-    repl<- read.table(paste("./POLARIS_test_data/ScenarioA1/N10000_OR11_20/Test/simulation", sim, ".raw", sep=""), header=T)
 
-    summ<- read.table(paste("./POLARIS_test_data/ScenarioA1/N10000_OR11_20/Discovery/simulation", sim, ".assoc.logistic", sep=""), header=T)
+	eff<- fread(paste("./POLARIS_test_data/ScenarioA1/Discovery/simulation", sim, ".assoc.logistic", sep=""), header=T, data.table=FALSE)
 	
-    #Filter out inclusion SNPs
-	summ<- summ[summ$P<=p_thr,]
+	dat<- fread(paste("./POLARIS_test_data/ScenarioA1/Test/simulation", sim, ".raw", sep=""), header=T, data.table=FALSE)
 
     #Remove last two digits from header to match summ file
-    header<- substr(colnames(repl)[7:ncol(repl)], 1, nchar(colnames(repl)[7:ncol(repl)])-2)
-    colnames(repl)[7:ncol(repl)]<- header
+    header<- substr(colnames(dat)[7:ncol(dat)], 1, nchar(colnames(dat)[7:ncol(dat)])-2)
+    colnames(dat)[7:ncol(dat)]<- header
     
     #Subset SNPs in the summary dataset
-    a<- which(colnames(repl) %in% summ$SNP)
-    repl<- repl[, c(1:6,a)]
-
-	#Separate SNPs only
-    snps<- as.matrix(repl[, 7:ncol(repl)])
+    a<- which(colnames(dat) %in% eff$SNP)
+    dat<- dat[, c(1:6,a)]
 	
-	#Spectral decomposition of the correlation matrix
-	spect_decomp<- eigen(cor(snps))
 	
-	eigval<- spect_decomp$values
-	eigvec<- spect_decomp$vectors
-	
-	A<-  summ$BETA %*% eigvec
-	
-	eigwgt<- eigvec
-	
-	for (i in 1:ncol(snps)){
-        eigwgt[,i]<- eigwgt[,i]* sqrt((1+(1/sqrt(nrow(snps))))/(eigval[i]+(1/sqrt(nrow(snps)))))
+	for (i in 7:ncol(dat)){
+		
+		s<- which(eff$SNP==colnames(dat)[i])
+		
+		#Change the 9 to whichever column is MAF
+		dat[is.na(dat[,i]),i]<- 2*eff[s,9]
+		
 	}
-	
-    #Find POLARS adjusted Betas
-	Badj<- eigwgt %*% t(A)
-	
-    #Compute POLARIS
-	polaris<- snps  %*%  Badj
-	
-    #Normalise POLARIS scores
-    polaris_norm<-((polaris-mean(polaris))/sd(polaris))
-    
-    #Create data with phenotype and normalised POLARIS scores
-    data<-data.frame((repl$PHENOTYPE-1), polaris_norm)
-    colnames(data)[1]<- "Status"
-    
-    #Fit model for score to find power
-	null<- glm(Status~1, data=data, family="binomial")
-	fit<- glm(Status~ polaris_norm, data=data, family="binomial")
-	
-	p<-1-pchisq(null$deviance-fit$deviance,1)
-	
+	 
+	co<-cor(as.matrix(dat[,7:ncol(dat)]))
+ 
+	ee<-eigen(co)
+	la0<-1/sqrt(nrow(dat))
+ 
+	PM<-ee$vectors %*% diag(sqrt((1+la0)/(ee$values+la0))) %*% t(ee$vectors)
+	POLARIS<- eff$BETA %*% PM %*% t(data.matrix(dat[,7:ncol(dat)]))
+					
+	fit<- glm((dat$PHENOTYPE-1)~t(POLARIS), family=binomial)
+	summary(fit)
+
 }
-
-print(Sys.time()-strt_time)
-
-
-
-
-
