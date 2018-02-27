@@ -510,7 +510,7 @@ def polaris(input_filename, output_filename, annot_filename):
         
         data.to_csv(filename, header=True, index=None, sep='\t')
 
-
+    MPI.COMM_WORLD.Barrier()
 
 ##################
 # Logit Function #
