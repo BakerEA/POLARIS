@@ -75,6 +75,7 @@ def annotation(input_filename, output_filename, annot, l_border, u_border):
     MPI.COMM_WORLD.Barrier()
 
     results=pd.DataFrame()
+    #results_list=[]
   
     for gene in range(start_gene-1, end_gene):
         
@@ -87,6 +88,8 @@ def annotation(input_filename, output_filename, annot, l_border, u_border):
 
         gene_snps=snps.loc[(snps[0]==gene_chr) & (snps[3]>=(gene_start-float(l_border))) & (snps[3]<=(gene_end+float(u_border)))]
 
+        #print(gene_snps)
+
         if len(gene_snps.index)!=0:
             gene_snps.loc[:,6]= str(gene_info)
 
@@ -94,6 +97,8 @@ def annotation(input_filename, output_filename, annot, l_border, u_border):
 
         if len(gene_snps.index)!=0:
             results=pd.concat([results,gene_snps], axis=0)
+
+        #print(results)
 
         results_list=results.values.tolist()
 
@@ -207,6 +212,9 @@ def polaris(input_filename, output_filename, annot_filename):
     unique_filename="unique_genes_" + str(output_filename)
     unigene=pd.read_table(unique_filename, names=unigene_names)
     
+    unigene['CHR']=unigene['GENE'].str.split('_',1).str[1]
+    unigene['CHR']=unigene['CHR'].str.split('_',1).str[0]
+    
     # Read in Annot Data #
     annot=pd.read_table(annot_filename, sep='\t')
     
@@ -221,81 +229,40 @@ def polaris(input_filename, output_filename, annot_filename):
     size = MPI.COMM_WORLD.Get_size()
     rank = MPI.COMM_WORLD.Get_rank()
     
-    a= int(math.floor(len(unigene)/size))
-    b=int(len(unigene)-(a*size))
+    for chr in range(22):
     
-    if ((rank+1)<=b):
-        start_gene=((rank)*a)+ (rank+1)
-        end_gene= start_gene + a
-    elif ((rank+1)==(b+1)):
-        start_gene= ((rank)*a)+(rank+1)
-        end_gene= start_gene + a - 1
-    else:
-        start_gene= (b*a) + (b+1) + ((rank-b)*(a-1)) + (rank-b)
-        end_gene= start_gene + a - 1
-    
-    MPI.COMM_WORLD.Barrier()
-
-    if rank==0:
-        results=np.empty([Nind,len(unigene)],dtype=np.float64)
-    
-    else:
-        results=np.empty([Nind,end_gene-start_gene+1],dtype=np.float64)
-
-    genename=[]
-    
-    #for gene in range(len(unique_gene)):
-    for gene in range(start_gene-1, end_gene):
+        chr=chr+1
         
-        # Find SNPs in gene #
-        gene_snp=annot[annot.GENE==unigene.iloc[gene]['GENE']]
+        if rank==0:
         
-        gene_snp=gene_snp.sort_values(['BP'])
-        
-        #Output gene chromosome
-        gene_chr=gene_snp.iloc[0]['CHR']
-        
-        filename1="data_" + str(output_filename) + "/" + str(input_filename)+ "_head_chr" + str(gene_chr)
-        filename2="data_" + str(output_filename) + "/" + str(input_filename)+ "_chr" + str(gene_chr) + "_nohead.raw"
-        filename3="summ/" + str(output_filename)+ "_chr" + str(gene_chr) + ".summ"
-        
-        #Read in header to determine SNP positions
-        infile= open(filename1, 'r')
-        firstline=infile.readline()
-        head=firstline.split()
-        infile.close()
-        header=np.array(head)
-        
-        snp_loc=[]
-        #Find SNP locations in .raw data
-        for i in range(len(gene_snp.index)):
-            for j in range(6,len(header)):
-                if str(gene_snp.iloc[i]['SNP'])==str(header[j]):
-                    snp_loc.append(j)
-    
-        snp_loc= np.unique(snp_loc)
-        
-        gene_name=str(unigene.iloc[gene]['GENE'])+ "_" + str(len(snp_loc))
-        
-        if len(snp_loc) != 0:
+            filename1="data_" + str(output_filename) + "/" + str(input_filename)+ "_head_chr" + str(chr)
+            filename2="data_" + str(output_filename) + "/" + str(input_filename)+ "_chr" + str(chr) + "_nohead.raw"
+            filename3="summ/" + str(output_filename)+ "_chr" + str(chr) + ".summ"
+                
+            #Read in header to determine SNP positions
+            infile= open(filename1, 'r')
+            firstline=infile.readline()
+            head=firstline.split()
+            infile.close()
+            header=np.array(head)
             
             infile= open(filename3, 'r')
             firstline=infile.readline()
             summ_head=firstline.split()
-            
+                
             #Find beta and maf locations in summ data
             for i in range(len(summ_head)):
                 if str(summ_head[i])=="BETA":
                     beta_loc=i
                 if str(summ_head[i])=="MAF":
                     maf_loc=i
-        
+            
             fs=open(filename3, 'r')
             beta=[]
             maf=[]
-            row=-1
+            row=0
             for line in fs:
-                if (row+6) in snp_loc:
+                if row>0:
                     beta.append(line.split()[beta_loc])
                     maf.append(line.split()[maf_loc])
                 row=row+1
@@ -303,118 +270,247 @@ def polaris(input_filename, output_filename, annot_filename):
             
             beta=np.asmatrix(beta, dtype=float)
             maf=np.array(maf, dtype=float)
-
+                
             f=open(filename2, 'r')
             data=[]
             for line in f:
                 datalist=[]
                 testlist=line.split()
-                for j in range(len(snp_loc)):
-                    datalist.append(testlist[snp_loc[j]][0])
-                loc=[i for i, x in enumerate(datalist) if x == "N"]
+                for j in range(len(testlist)):
+                    datalist.append(testlist[j])
+                loc=[i for i, x in enumerate(datalist) if x == "NA"]
                 for i in range(len(loc)):
-                    datalist[loc[i]]=2*float(maf[loc[i]])
+                    datalist[loc[i]]=2*float(maf[loc[i]-6])
                 data.append(datalist)
             f.close()
-            
-            data=np.array(data)
-            data=np.asmatrix(data, dtype=float)
-            
-            if len(snp_loc)==1:
-                
-                score= data * beta
-            
-            else:
-                
-                corr_mat=np.corrcoef(data, rowvar=0)
-                
-                eval, evect=LA.eig(corr_mat)
-                
-                idx = eval.argsort()[::-1]
-                eval = eval[idx]
-                evect = evect[:,idx]
-                
-                pc_snp=beta * evect
-                
-                pc_wgt=evect
-                for i in range(len(eval)):
-                    pc_wgt[:,i] *= math.sqrt((1+(1/math.sqrt(Nind)))/(eval[i]+(1/math.sqrt(Nind))))
-            
-                Bi= pc_wgt * pc_snp.transpose()
 
-                score= data * Bi
+            data=pd.DataFrame(data)
         
-            gene_score=pd.DataFrame(score, columns=['GeneName'])
-            
-            if rank==0:
-                results[:,gene:gene+1]=np.array(score)
-            else:
-                results[:,gene-start_gene+1:gene-start_gene+2]=np.array(score)
+            filename4="data_" + str(output_filename) + "/" + str(input_filename)+ "_chr" + str(chr) + "_nomiss_nohead.raw"
+            data.to_csv(filename4, header=None, index=None, sep=' ')
 
-        genename.append(gene_name)
-    
+        unigene_chr=unigene[unigene.CHR==str(chr)]
+
+
+        a= int(math.floor(len(unigene_chr)/size))
+        b=int(len(unigene_chr)-(a*size))
+        
+        if ((rank+1)<=b):
+            start_gene=((rank)*a)+ (rank+1)
+            end_gene= start_gene + a
+        elif ((rank+1)==(b+1)):
+            start_gene= ((rank)*a)+(rank+1)
+            end_gene= start_gene + a - 1
+        else:
+            start_gene= (b*a) + (b+1) + ((rank-b)*(a-1)) + (rank-b)
+            end_gene= start_gene + a - 1
+        
+        MPI.COMM_WORLD.Barrier()
+
+        if rank==0:
+            results=np.empty([Nind,len(unigene_chr)],dtype=np.float64)
+        
+        else:
+            results=np.empty([Nind,end_gene-start_gene+1],dtype=np.float64)
+
+        genename=[]
+        
+        for gene in range(start_gene-1, end_gene):
+            
+            # Find SNPs in gene #
+            gene_snp=annot[annot.GENE==unigene_chr.iloc[gene]['GENE']]
+            
+            gene_snp=gene_snp.sort_values(['BP'])
+            
+            #Output gene chromosome
+            gene_chr=gene_snp.iloc[0]['CHR']
+            
+            filename1="data_" + str(output_filename) + "/" + str(input_filename)+ "_head_chr" + str(gene_chr)
+            filename2="data_" + str(output_filename) + "/" + str(input_filename)+ "_chr" + str(gene_chr) + "_nomiss_nohead.raw"
+            filename3="summ/" + str(output_filename)+ "_chr" + str(gene_chr) + ".summ"
+            
+            #Read in header to determine SNP positions
+            infile= open(filename1, 'r')
+            firstline=infile.readline()
+            head=firstline.split()
+            infile.close()
+            header=np.array(head)
+
+            snp_loc=[]
+            #Find SNP locations in .raw data
+            for i in range(len(gene_snp.index)):
+                for j in range(6,len(header)):
+                    if str(gene_snp.iloc[i]['SNP'])==str(header[j]):
+                        snp_loc.append(j)
+        
+            snp_loc= np.unique(snp_loc)
+
+            gene_name=str(unigene_chr.iloc[gene]['GENE'])+ "_" + str(len(snp_loc))
+
+            if len(snp_loc) != 0:
+                
+                infile= open(filename3, 'r')
+                firstline=infile.readline()
+                summ_head=firstline.split()
+                
+                #Find beta and maf locations in summ data
+                for i in range(len(summ_head)):
+                    if str(summ_head[i])=="BETA":
+                        beta_loc=i
+                    if str(summ_head[i])=="MAF":
+                        maf_loc=i
+            
+                fs=open(filename3, 'r')
+                beta=[]
+                maf=[]
+                row=-1
+                for line in fs:
+                    if (row+6) in snp_loc:
+                        beta.append(line.split()[beta_loc])
+                        maf.append(line.split()[maf_loc])
+                    row=row+1
+                fs.close()
+                
+                beta=np.asmatrix(beta, dtype=float)
+                maf=np.array(maf, dtype=float)
+
+                f=open(filename2, 'r')
+                data=[]
+                for line in f:
+                    datalist=[]
+                    testlist=line.split()
+                    for j in range(len(snp_loc)):
+                        datalist.append(testlist[snp_loc[j]])
+                    data.append(datalist)
+                f.close()
+                
+                data=np.array(data)
+                data=np.asmatrix(data, dtype=float)
+
+
+                if len(snp_loc)==1:
+                    
+                    score= data * beta
+                
+                else:
+                    
+                    corr_mat=np.corrcoef(data, rowvar=0)
+                    
+                    eval, evect=LA.eig(corr_mat)
+                    
+                    idx = eval.argsort()[::-1]
+                    eval = eval[idx]
+                    evect = evect[:,idx]
+                    
+                    pc_snp=beta * evect
+                    
+                    pc_wgt=evect
+                    for i in range(len(eval)):
+                        pc_wgt[:,i] *= math.sqrt((1+(1/math.sqrt(Nind)))/(eval[i]+(1/math.sqrt(Nind))))
+                
+                    Bi= pc_wgt * pc_snp.transpose()
+
+                    score= data * Bi
+            
+                gene_score=pd.DataFrame(score, columns=['GeneName'])
+                
+                if rank==0:
+                    results[:,gene:gene+1]=np.array(score)
+                else:
+                    results[:,gene-start_gene+1:gene-start_gene+2]=np.array(score)
+
+            genename.append(gene_name)
+        
+        MPI.COMM_WORLD.Barrier()
+
+        if rank==0:
+            
+            a= int(math.floor(len(unigene_chr)/size))
+            b=int(len(unigene_chr)-(a*size))
+            
+            for proc in range(1,size):
+                if ((proc+1)<=b):
+                    start_gene=((proc)*a)+ (proc+1)
+                    end_gene= start_gene + a
+                elif ((proc+1)==(b+1)):
+                    start_gene= ((proc)*a)+(proc+1)
+                    end_gene= start_gene + a - 1
+                else:
+                    start_gene= (b*a) + (b+1) + ((proc-b)*(a-1)) + (proc-b)
+                    end_gene= start_gene + a - 1
+            
+                ncol=(end_gene-start_gene+1)
+                
+                local_a = np.zeros([Nind,ncol], dtype=np.float64)
+                
+                MPI.COMM_WORLD.Recv(local_a, source=proc)
+                
+                results[:,start_gene-1:end_gene]=local_a
+        
+                del local_a
+
+        else:
+        
+            MPI.COMM_WORLD.Send(results[:,:], dest=0)
+        
+        MPI.COMM_WORLD.Barrier()
+        
+        if rank==0:
+            
+            for proc in range(1,size):
+                
+                local_b=MPI.COMM_WORLD.recv(source=proc)
+                
+                genename.extend(local_b)
+                
+                #print (genename)
+                
+                del local_b
+
+        else:
+            MPI.COMM_WORLD.send(genename, dest=0)
+        
+        MPI.COMM_WORLD.Barrier()
+
+        if rank==0:
+            
+            results=pd.DataFrame(results)
+            
+            #print(results)
+            
+            results.columns=genename
+            
+            final_results=pd.concat([fam, results], axis=1)
+            
+            #print(final_results)
+            
+            filename= "results/" + str(output_filename) + "_chr" + str(chr) + ".polaris"
+            
+            final_results.to_csv(filename, header=True, index=None, sep='\t')
+
     MPI.COMM_WORLD.Barrier()
-    
-    if rank==0:
-        
-        a= int(math.floor(len(unigene)/size))
-        b=int(len(unigene)-(a*size))
-        
-        for proc in range(1,size):
-            if ((proc+1)<=b):
-                start_gene=((proc)*a)+ (proc+1)
-                end_gene= start_gene + a
-            elif ((proc+1)==(b+1)):
-                start_gene= ((proc)*a)+(proc+1)
-                end_gene= start_gene + a - 1
-            else:
-                start_gene= (b*a) + (b+1) + ((proc-b)*(a-1)) + (proc-b)
-                end_gene= start_gene + a - 1
-        
-            ncol=(end_gene-start_gene+1)
-            
-            local_a = np.zeros([Nind,ncol], dtype=np.float64)
-            
-            MPI.COMM_WORLD.Recv(local_a, source=proc)
-            
-            results[:,start_gene-1:end_gene]=local_a
-    
-            del local_a
-
-    else:
-    
-        MPI.COMM_WORLD.Send(results[:,:], dest=0)
-    
-    MPI.COMM_WORLD.Barrier()
-    
-    if rank==0:
-        
-        for proc in range(1,size):
-            
-            local_b=MPI.COMM_WORLD.recv(source=proc)
-            
-            genename.extend(local_b)
-            
-            #print (genename)
-            
-            del local_b
-
-    else:
-        MPI.COMM_WORLD.send(genename, dest=0)
-    
-    MPI.COMM_WORLD.Barrier()
 
     if rank==0:
-        
-        results=pd.DataFrame(results)
-        
-        results.columns=genename
-        
-        final_results=pd.concat([fam, results], axis=1)
-        
+
+        filename= "results/" + str(output_filename) + "_chr1.polaris"
+        data=pd.read_table(filename)
+
+        for chr in range(1,22):
+            chr=chr+1
+            filename= "results/" + str(output_filename) + "_chr" + str(chr) + ".polaris"
+            test=pd.read_table(filename)
+            
+            num_genes=len(test.columns)-3
+            
+            if num_genes>0:
+            
+                data=pd.concat([data, test[:, 3:len(test.columns)]])
+
         filename= "results/" + str(output_filename) + ".polaris"
         
-        final_results.to_csv(filename, header=True, index=None, sep='\t')
+        data.to_csv(filename, header=True, index=None, sep='\t')
+
+
 
 ##################
 # Logit Function #

@@ -356,17 +356,21 @@ if rank==0:
 ###########################
 
 if rank==0:
-    #command= "rm ./summ/*"
-    #os.system(command)
+    command= "rm ./summ/*"
+    os.system(command)
             
     command2= "rm ./data_" + str(output_filename)+ "/*"
     os.system(command2)
         
-    #command3= "rmdir summ"
-    #os.system(command3)
+    command3= "rmdir summ"
+    os.system(command3)
         
-    command4= "rmdir ./data_" + str(output_filename)+ "/*"
+    command4= "rmdir ./data_" + str(output_filename)
     os.system(command4)
+
+    command5= "rm ./results/" + str(output_filename) + "_chr*"
+    os.system(command5)
+
 
 MPI.COMM_WORLD.Barrier()
 
