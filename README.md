@@ -102,3 +102,9 @@ Using test data and an annotation file:
 
 mpiexec -np nproc python POLARIS_master.py --INFILE POLARIS_test_data  -- OUTFILE POLARIS_test_data  -- THR pval_thr  -- ANNOT POLARIS_test_data.genes.annot -- SUMM POLARIS_test_summ_data   -- COVAR covariate_filename
 
+
+# NOTE:
+
+With sets of at least 200 SNPs, the eigen solver in Python produces complex numbers, so although the code runs, the imaginary part of the number is ignored. Therefore, it is advised to use sets less than 200 SNPs. The code will output an error message if complex numbers are produced, but will still complete.
+
+I am currently working on a new code which will be able to handle much larger sets of SNPs.
